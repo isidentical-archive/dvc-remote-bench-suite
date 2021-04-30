@@ -5,6 +5,7 @@ import runpy
 import shutil
 import statistics
 import subprocess
+import tempfile
 import time
 import uuid
 from argparse import ArgumentParser
@@ -14,7 +15,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from pprint import pprint
-from tempfile import TemporaryDirectory
 from typing import Dict
 
 ROOT_DIR = Path(__file__).parent
@@ -34,9 +34,9 @@ _GLOBAL_CONFIG["base_tmp"] = os.getenv("BENCH_BASE_TMP", tempfile.gettempdir())
 
 @contextmanager
 def temp_location():
-    with TemporaryDirectory(
-        dir=f"{_GLOBAL_CONFIG.get('base_tmp')}/projects"
-    ) as tmp_dir:
+    base_dir = Path(f"{_GLOBAL_CONFIG['base_tmp']}/projects")
+    base_dir.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=base_dir) as tmp_dir:
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_dir)
@@ -53,9 +53,7 @@ def random_file(path, file_size):
 
 def random_data_dir(num_files, file_size):
     dirname = "data_{}_{}".format(num_files, file_size)
-    dir_path = os.path.join(
-        f"{_GLOBAL_CONFIG.get('base_tmp')}/dvc_data/", dirname
-    )
+    dir_path = os.path.join(f"{_GLOBAL_CONFIG['base_tmp']}/dvc_data/", dirname)
 
     if not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
@@ -157,7 +155,7 @@ def run(env_file, repeat=3, stories=None):
     with open(env_file) as stream:
         environments = json.load(stream)
 
-    if config := environments.pop("config"):
+    if config := environments.pop("config", None):
         _GLOBAL_CONFIG.update(config)
 
     all_runs = {}

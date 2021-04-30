@@ -34,7 +34,7 @@ def run(context):
     yield "fresh status (nothing missing, 2k + 4k files on the remote)", run_status, dvc_file
     context.generate_data(2049, name=data)
     yield "status (1 missing file, 2k + 4k files on the remote)", run_status, dvc_file
-    yield "push only new files (1 new small file, 2k + 32k files on the remote)", run_push, dvc_file
+    yield "push only new files (1 new small file, 2k + 4k files on the remote)", run_push, dvc_file
 
     context.generate_data(2100, name=data)
     yield "status (51 missing file, 2k + 4k files on the remote)", run_status, dvc_file
