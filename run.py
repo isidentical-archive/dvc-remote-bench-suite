@@ -21,18 +21,22 @@ ROOT_DIR = Path(__file__).parent
 STORIES_DIR = ROOT_DIR / "stories"
 
 _FILE_SIZE = {
-    "nano": 64,
-    "mini": 256,
-    "small": 512,
-    "medium": 1024,
-    "big": 1024 * 5,
-    "giant": 1024 * 80,
+    "nano": 64 * 1024,
+    "mini": 256 * 1024,
+    "small": 512 * 1024,
+    "medium": 1024 * 1024,
+    "big": 1024 * 1024 * 5,
+    "giant": 1024 * 1024 * 80,
 }
+_GLOBAL_CONFIG = {}
+_GLOBAL_CONFIG["base_tmp"] = os.getenv("BENCH_BASE_TMP", tempfile.gettempdir())
 
 
 @contextmanager
 def temp_location():
-    with TemporaryDirectory() as tmp_dir:
+    with TemporaryDirectory(
+        dir=f"{_GLOBAL_CONFIG.get('base_tmp')}/projects"
+    ) as tmp_dir:
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_dir)
@@ -49,7 +53,9 @@ def random_file(path, file_size):
 
 def random_data_dir(num_files, file_size):
     dirname = "data_{}_{}".format(num_files, file_size)
-    dir_path = os.path.join("/tmp/dvc_data/", dirname)
+    dir_path = os.path.join(
+        f"{_GLOBAL_CONFIG.get('base_tmp')}/dvc_data/", dirname
+    )
 
     if not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
@@ -94,6 +100,9 @@ class Context:
         self.dvc("add", name or dirname)
         return dirname
 
+    def clear_cache(self):
+        shutil.rmtree(self.path / ".dvc" / "cache")
+
 
 def timed(func, *args, **kwargs):
     t0 = time.perf_counter()
@@ -101,11 +110,13 @@ def timed(func, *args, **kwargs):
     return time.perf_counter() - t0
 
 
-def run_stories(env):
+def run_stories(env, stories=None):
     results = defaultdict(dict)
     for story_path in STORIES_DIR.glob("story_*.py"):
         story_mod = runpy.run_path(story_path)
         story_name = story_mod.get("name", story_path.stem)
+        if stories is not None and story_name not in stories:
+            continue
 
         with temp_location() as temp_path:
             context = Context(env.copy(), temp_path)
@@ -142,15 +153,17 @@ def print_results(name, results):
             print(" " * 7, message)
 
 
-def run(env_file, repeat=3):
+def run(env_file, repeat=3, stories=None):
     with open(env_file) as stream:
         environments = json.load(stream)
 
+    if config := environments.pop("config"):
+        _GLOBAL_CONFIG.update(config)
+
     all_runs = {}
-    for environment in environments:
-        name = environment.pop("name")
+    for name, environment in environments.items():
         all_runs[name] = merge_runs(
-            run_stories(environment) for _ in range(repeat)
+            run_stories(environment, stories) for _ in range(repeat)
         )
 
     for name, results in all_runs.items():
@@ -161,6 +174,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("env_file")
     parser.add_argument("--repeat", type=int, default=3)
+    parser.add_argument("--stories", type=str, nargs="*", default=None)
 
     options = parser.parse_args()
     return run(**vars(options))

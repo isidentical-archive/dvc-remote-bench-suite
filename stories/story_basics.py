@@ -1,3 +1,4 @@
+import os
 import shutil
 import time
 
@@ -12,9 +13,21 @@ def run_pull(context, stage):
     context.dvc("pull", stage)
 
 
+def run_gc(context):
+    context.dvc("gc", "-w", "-f", "-c")
+
+
 def run(context):
     data = context.generate_data(1024)
-    yield "push (1024 small files)", run_push, f"{data}.dvc"
+    dvc_file = f"{data}.dvc"
+
+    yield "push (1024 small files)", run_push, dvc_file
+
     shutil.rmtree(data)
     shutil.rmtree(context.path / ".dvc" / "cache")
-    yield "pull (1024 small files)", run_pull, f"{data}.dvc"
+
+    yield "pull (1024 small files)", run_pull, dvc_file
+
+    os.unlink(dvc_file)
+    shutil.rmtree(data)
+    context.clear_cache()

@@ -39,3 +39,4 @@ scripts/ci/gcp-creds.json
 
 *~
 env.json
+*env*.json
